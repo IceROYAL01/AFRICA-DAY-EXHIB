@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JARVIS Tactical Command // Complete African Matrix</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #00f0ff;
+      --secondary: #0044ff;
+      --alert: #ff0055;
+      --panel-bg: rgba(2, 6, 16, 0.92);
+      --border: rgba(0, 240, 255, 0.25);
+    }
+
+    body, html {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      overflow: hidden; background: #010308;
+      font-family: 'Share Tech Mono', monospace; color: var(--primary);
+      user-select: none;
+    }
+
+    #globe-container {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;
+    }
+
+    /* HUD Scanlines & Overlay Vignette */
+    .scanlines {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%);
+      background-size: 100% 4px; z-index: 50; pointer-events: none; opacity: 0.35;
+    }
+    .vignette {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: radial-gradient(circle, rgba(0,0,0,0) 25%, rgba(0,0,0,0.9) 100%);
+      z-index: 49; pointer-events: none;
+    }
+
+    /* Left Sidebar: Command Matrix Grid */
+    .command-sidebar {
+      position: absolute; top: 20px; left: 20px; bottom: 20px;
+      width: 340px; background: var(--panel-bg);
+      border: 1px solid var(--border); border-radius: 4px;
+      z-index: 10; display: flex; flex-direction: column;
+      box-shadow: 0 0 30px rgba(0,0,0,0.8); backdrop-filter: blur(15px);
+    }
+    .sidebar-title {
+      font-family: 'Orbitron', sans-serif; padding: 15px 20px;
+      font-size: 0.95em; letter-spacing: 2px; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .live-tag { color: #00ff66; font-size: 0.75em; animation: flash 1.5s infinite; }
+    
+    .search-wrapper { padding: 12px 15px; background: rgba(0,0,0,0.3); border-bottom: 1px solid rgba(0,240,255,0.1); }
+    .search-wrapper input {
+      width: 100%; background: rgba(0, 240, 255, 0.04); border: 1px solid rgba(0, 240, 255, 0.3);
+      padding: 10px; box-sizing: border-box; color: #fff; font-family: 'Share Tech Mono', monospace;
+      outline: none; text-transform: uppercase; letter-spacing: 1px;
+    }
+    .search-wrapper input:focus { border-color: var(--primary); background: rgba(0, 240, 255, 0.08); box-shadow: 0 0 10px rgba(0,240,255,0.2); }
+
+    .matrix-grid {
+      flex: 1; overflow-y: auto; padding: 12px;
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;
+    }
+    .matrix-grid::-webkit-scrollbar { width: 4px; }
+    .matrix-grid::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.3); }
+
+    .macro-key {
+      background: rgba(0, 240, 255, 0.02); border: 1px solid rgba(0, 240, 255, 0.15);
+      color: rgba(255,255,255,0.7); padding: 10px 6px; font-size: 0.75em;
+      text-align: left; cursor: pointer; transition: all 0.15s ease;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 2px;
+    }
+    .macro-key:hover {
+      background: rgba(0, 240, 255, 0.12); border-color: var(--primary); color: var(--primary);
+    }
+    .macro-key.active-lock {
+      background: var(--primary); border-color: var(--primary); color: #000; font-weight: bold;
+      box-shadow: 0 0 10px rgba(0,240,255,0.4);
+    }
+
+    /* Right Sidebar: Deep Telemetry Metrics Panel */
+    .telemetry-panel {
+      position: absolute; top: 20px; right: 20px; width: 380px;
+      padding: 25px; background: var(--panel-bg); backdrop-filter: blur(15px);
+      border: 1px solid var(--border); border-radius: 4px;
+      box-shadow: 0 0 30px rgba(0,0,0,0.8); z-index: 10;
+      opacity: 0; transform: translateX(50px);
+      transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1); pointer-events: none;
+    }
+    .telemetry-panel.active { opacity: 1; transform: translateX(0); pointer-events: auto; }
+
+    .panel-header { font-family: 'Orbitron', sans-serif; font-size: 1.1em; letter-spacing: 2px; margin-bottom: 20px; color: #fff; display: flex; align-items: center; gap: 10px; }
+    .scan-status { font-size: 0.6em; background: var(--primary); color: #000; padding: 2px 6px; font-weight: bold; border-radius: 2px; }
+
+    .metric-row { display: flex; justify-content: space-between; margin: 12px 0; border-bottom: 1px dashed rgba(0,240,255,0.08); padding-bottom: 6px; }
+    .m-label { color: rgba(0, 240, 255, 0.45); font-size: 0.8em; text-transform: uppercase; }
+    .m-value { color: #fff; font-size: 1.05em; text-align: right; text-shadow: 0 0 5px rgba(255,255,255,0.2); }
+
+    .intel-briefing {
+      margin-top: 20px; padding: 12px; background: rgba(0, 240, 255, 0.03);
+      border: 1px solid rgba(0, 240, 255, 0.15); font-size: 0.9em; color: #bdf6ff; line-height: 1.45;
+    }
+
+    .system-footer { padding: 12px; border-top: 1px solid rgba(0, 240, 255, 0.1); text-align: center; }
+    .reset-btn {
+      width: 100%; background: none; border: 1px solid rgba(255, 0, 85, 0.4); color: rgba(255, 0, 85, 0.8);
+      font-family: 'Orbitron', sans-serif; font-size: 0.75em; padding: 8px; cursor: pointer; transition: 0.2s; letter-spacing: 1px;
+    }
+    .reset-btn:hover { background: rgba(255, 0, 85, 0.12); color: #ff0055; border-color: #ff0055; }
+
+    .bottom-hud { position: absolute; bottom: 20px; left: 380px; font-size: 0.8em; color: rgba(255,255,255,0.25); z-index: 5; letter-spacing: 1px; }
+
+    @keyframes flash { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+  </style>
+</head>
+<body>
+
+  <div class="scanlines"></div>
+  <div class="vignette"></div>
+  <div class="bottom-hud" id="hud-coordinates">SYS.ORBITAL // LAT: -- | LNG: --</div>
+
+  <div id="globe-container"></div>
+
+  <!-- Left Sidebar (Inputs) -->
+  <div class="command-sidebar">
+    <div class="sidebar-title">
+      <span>TACTICAL INTERFACE</span>
+      <span class="live-tag">● GRID ONLINE</span>
+    </div>
+    <div class="search-wrapper">
+      <input type="text" id="matrix-search" placeholder="FILTER SECTOR ID...">
+    </div>
+    <div class="matrix-grid" id="macro-grid"></div>
+    <div class="system-footer">
+      <button class="reset-btn" id="system-reset">RESET SYSTEM VELOCITY</button>
+    </div>
+  </div>
+
+  <!-- Right Sidebar (Outputs) -->
+  <div class="telemetry-panel" id="intel-panel">
+    <div class="panel-header">
+      <span>SECTOR PROFILE</span>
+      <span class="scan-status" id="scan-indicator">DOWNLOADING...</span>
+    </div>
+    
+    <div class="metric-row"><span class="m-label">Geopolitical ID</span><span id="m-name" class="m-value">--</span></div>
+    <div class="metric-row"><span class="m-label">Administrative Node</span><span id="m-capital" class="m-value">--</span></div>
+    <div class="metric-row"><span class="m-label">Demographic Density</span><span id="m-pop" class="m-value">--</span></div>
+    <div class="metric-row"><span class="m-label">Geographic Area Mass</span><span id="m-area" class="m-value">--</span></div>
+    <div class="metric-row"><span class="m-label">Financial Output (GDP)</span><span id="m-gdp" class="m-value">--</span></div>
+    <div class="metric-row"><span class="m-label">Linguistic Channels</span><span id="m-lang" class="m-value">--</span></div>
+    <div class="metric-row"><span class="m-label">System Tender (Currency)</span><span id="m-currency" class="m-value">--</span></div>
+    
+    <div class="intel-briefing" id="m-brief">--</div>
+  </div>
+
+  <!-- CDN Script Bundles -->
+  <script src="three.min.js"></script>
+<script src="globe.gl.min.js"></script>
+
+  <script>
+    // 100% Local Self-Contained Database (Full 54 African Sovereign Roster)
+    const sectors = [
+      { name: "Algeria", lat: 28.0339, lng: 1.6596, cap: "Algiers", pop: "47.5M", area: "2,381,741 KM²", gdp: "$240B (Nominal)", lang: "Arabic, Berber", cur: "DZD (Dinar)", fact: "The largest country in Africa by total land area mass." },
+      { name: "Angola", lat: -11.2027, lng: 17.8739, cap: "Luanda", pop: "37.8M", area: "1,246,700 KM²", gdp: "$92B (Nominal)", lang: "Portuguese", cur: "AOA (Kwanza)", fact: "Rich sub-Saharan economic hub dominating petroleum networks." },
+      { name: "Benin", lat: 9.3077, lng: 2.3158, cap: "Porto-Novo", pop: "14.4M", area: "114,763 KM²", gdp: "$19B (Nominal)", lang: "French", cur: "XOF (CFA Franc)", fact: "The historical birthplace and cultural cradle of the Vodun religion." },
+      { name: "Botswana", lat: -22.3285, lng: 24.6849, cap: "Gaborone", pop: "2.7M", area: "581,730 KM²", gdp: "$21B (Nominal)", lang: "English, Setswana", cur: "BWP (Pula)", fact: "Maintains the world's highest producing high-gem diamond mining hubs." },
+      { name: "Burkina Faso", lat: 12.2383, lng: -1.5616, cap: "Ouagadougou", pop: "23.8M", area: "274,200 KM²", gdp: "$20B (Nominal)", lang: "French", cur: "XOF (CFA Franc)", fact: "Name translates directly into the 'Land of Incorruptible People'." },
+      { name: "Burundi", lat: -3.3731, lng: 29.9189, cap: "Gitega", pop: "13.6M", area: "27,834 KM²", gdp: "$4B (Nominal)", lang: "Kirundi, French", cur: "BIF (Franc)", fact: "Commonly known as the geographical 'Heart of Africa'." },
+      { name: "Cabo Verde", lat: 16.5388, lng: -23.0418, cap: "Praia", pop: "600K", area: "4,033 KM²", gdp: "$2.5B (Nominal)", lang: "Portuguese", cur: "CVE (Escudo)", fact: "Volcanic archipelago showing exceptionally stable democratic governance." },
+      { name: "Cameroon", lat: 7.3697, lng: 12.3547, cap: "Yaoundé", pop: "29.4M", area: "475,442 KM²", gdp: "$48B (Nominal)", lang: "French, English", cur: "XAF (CFA Franc)", fact: "Often described as 'Africa in miniature' due to extreme geographic diversity." },
+      { name: "Central African Republic", lat: 6.6111, lng: 20.9394, cap: "Bangui", pop: "5.9M", area: "622,984 KM²", gdp: "$2.7B (Nominal)", lang: "Sango, French", cur: "XAF (CFA Franc)", fact: "Possesses immense unmined mineral nodes, including uranium fields." },
+      { name: "Chad", lat: 15.4542, lng: 18.7322, cap: "N'Djamena", pop: "18.8M", area: "1,284,000 KM²", gdp: "$13B (Nominal)", lang: "Arabic, French", cur: "XAF (CFA Franc)", fact: "The rugged northern zone contains the massive volcanic Tibesti Mountains." },
+      { name: "Comoros", lat: -11.6455, lng: 43.3333, cap: "Moroni", pop: "860K", area: "2,235 KM²", gdp: "$1.3B (Nominal)", lang: "Comorian, Arabic, French", cur: "KMF (Franc)", fact: "Major global exporter of premium essential perfume bases like ylang-ylang." },
+      { name: "Republic of the Congo", lat: -0.2280, lng: 15.8277, cap: "Brazzaville", pop: "6.2M", area: "342,000 KM²", gdp: "$15B (Nominal)", lang: "French", cur: "XAF (CFA Franc)", fact: "Home to expansive, protected tracking preserves across the Congo Basin." },
+      { name: "DR Congo", lat: -4.0383, lng: 21.7587, cap: "Kinshasa", pop: "105.6M", area: "2,344,858 KM²", gdp: "$65B (Nominal)", lang: "French", cur: "CDF (Franc)", fact: "Holds the second largest absolute tropical rainforest system on planet Earth." },
+      { name: "Côte d'Ivoire", lat: 7.5400, lng: -5.5471, cap: "Yamoussoukro", pop: "29.9M", area: "322,463 KM²", gdp: "$78B (Nominal)", lang: "French", cur: "XOF (CFA Franc)", fact: "The world's absolute leading commercial producer and exporter of cocoa beans." },
+      { name: "Djibouti", lat: 11.8251, lng: 42.5903, cap: "Djibouti", pop: "1.1M", area: "23,200 KM²", gdp: "$4B (Nominal)", lang: "Arabic, French", cur: "DJF (Franc)", fact: "Highly strategic military-maritime center bordering Red Sea shipping lanes." },
+      { name: "Egypt", lat: 26.8206, lng: 30.8025, cap: "Cairo", pop: "114.5M", area: "1,001,450 KM²", gdp: "$395B (Nominal)", lang: "Arabic", cur: "EGP (Pound)", fact: "Controls the Suez Canal asset. Home to legendary ancient monuments." },
+      { name: "Equatorial Guinea", lat: 1.6508, lng: 10.2679, cap: "Malabo", pop: "1.7M", area: "28,051 KM²", gdp: "$12B (Nominal)", lang: "Spanish, French", cur: "XAF (CFA Franc)", fact: "The single Spanish-speaking sovereign state operating in mainland Africa." },
+      { name: "Eritrea", lat: 15.1794, lng: 39.7823, cap: "Asmara", pop: "3.8M", area: "117,600 KM²", gdp: "$2.5B (Nominal)", lang: "Tigrinya, Arabic, English", cur: "ERN (Nakfa)", fact: "Capital city is globally celebrated for uniform modernist architecture." },
+      { name: "Eswatini", lat: -26.5225, lng: 31.4659, cap: "Mbabane", pop: "1.2M", area: "17,364 KM²", gdp: "$5B (Nominal)", lang: "English, Swati", cur: "SZL (Lilangeni)", fact: "One of the final absolute monarchies existing on the global grid." },
+      { name: "Ethiopia", lat: 9.1450, lng: 40.4896, cap: "Addis Ababa", pop: "129.7M", area: "1,104,300 KM²", gdp: "$156B (Nominal)", lang: "Amharic", cur: "ETB (Birr)", fact: "The historical birthplace of coffee; operates a unique 13-month calendar system." },
+      { name: "Gabon", lat: -0.8037, lng: 11.6094, cap: "Libreville", pop: "2.5M", area: "267,667 KM²", gdp: "$22B (Nominal)", lang: "French", cur: "XAF (CFA Franc)", fact: "Over 11% of its absolute surface is completely dedicated to national parks." },
+      { name: "Gambia", lat: 13.4432, lng: -15.3101, cap: "Banjul", pop: "2.8M", area: "10,689 KM²", gdp: "$2.3B (Nominal)", lang: "English", cur: "GMD (Dalasi)", fact: "The smallest geographic mainland nation-state inside the continent." },
+      { name: "Ghana", lat: 7.9465, lng: -1.0232, cap: "Accra", pop: "34.4M", area: "238,533 KM²", gdp: "$76B (Nominal)", lang: "English", cur: "GHS (Cedi)", fact: "First sub-Saharan country to reclaim independent modern sovereignty." },
+      { name: "Guinea", lat: 9.9456, lng: -9.6966, cap: "Conakry", pop: "14.5M", area: "245,857 KM²", gdp: "$23B (Nominal)", lang: "French", cur: "GNF (Franc)", fact: "Holds roughly one-third of the entire planet's known bauxite reserves." },
+      { name: "Guinea-Bissau", lat: 11.8037, lng: -15.1804, cap: "Bissau", pop: "2.2M", area: "36,125 KM²", gdp: "$2B (Nominal)", lang: "Portuguese", cur: "XOF (CFA Franc)", fact: "Encompasses the highly protected, fragile Bijagós Archipelago biosystem." },
+      { name: "Kenya", lat: -0.0236, lng: 37.9062, cap: "Nairobi", pop: "56.8M", area: "580,367 KM²", gdp: "$115B (Nominal)", lang: "Swahili, English", cur: "KES (Shilling)", fact: "Tech pioneer zone; birthplace and headquarters of M-Pesa mobile banking." },
+      { name: "Lesotho", lat: -29.6099, lng: 28.2336, cap: "Maseru", pop: "2.3M", area: "30,355 KM²", gdp: "$2.5B (Nominal)", lang: "Sesotho, English", cur: "LSL (Loti)", fact: "An enclaved high alpine kingdom elevated entirely above 1,400 meters." },
+      { name: "Liberia", lat: 6.4281, lng: -9.4295, cap: "Monrovia", pop: "5.5M", area: "111,369 KM²", gdp: "$4.3B (Nominal)", lang: "English", cur: "LRD (Dollar)", fact: "Africa's oldest republic, established as a modern state structure in 1847." },
+      { name: "Libya", lat: 26.3351, lng: 17.2283, cap: "Tripoli", pop: "7.0M", area: "1,759,540 KM²", gdp: "$40B (Nominal)", lang: "Arabic", cur: "LYD (Dinar)", fact: "Sits directly on top of the largest proven crude oil reserves in Africa." },
+      { name: "Madagascar", lat: -18.7669, lng: 46.8691, cap: "Antananarivo", pop: "31.3M", area: "587,041 KM²", gdp: "$16B (Nominal)", lang: "Malagasy, French", cur: "MGA (Ariary)", fact: "An isolated biodiversity engine; over 90% of its wildlife is endemic." },
+      { name: "Malawi", lat: -13.2543, lng: 34.3015, cap: "Lilongwe", pop: "21.5M", area: "118,484 KM²", gdp: "$13B (Nominal)", lang: "English, Chichewa", cur: "MWK (Kwacha)", fact: "Home to Lake Malawi, containing more unique fish species than any lake on Earth." },
+      { name: "Mali", lat: 17.5707, lng: -3.9962, cap: "Bamako", pop: "23.9M", area: "1,240,192 KM²", gdp: "$21B (Nominal)", lang: "Bambara (Official: French)", cur: "XOF (CFA Franc)", fact: "Historic home to Timbuktu, legendary scholastic core of ancient trade networks." },
+      { name: "Mauritania", lat: 21.0079, lng: -10.9408, cap: "Nouakchott", pop: "5.0M", area: "1,030,700 KM²", gdp: "$10B (Nominal)", lang: "Arabic", cur: "MRU (Ouguiya)", fact: "Geographically bridges the Maghreb desert dunes with West African coastlines." },
+      { name: "Mauritius", lat: -20.3484, lng: 57.5522, cap: "Port Louis", pop: "1.3M", area: "2,040 KM²", gdp: "$14B (Nominal)", lang: "English, French", cur: "MUR (Rupee)", fact: "Highly dynamic island state holding leading regional Human Development indices." },
+      { name: "Morocco", lat: 31.7917, lng: -7.0926, cap: "Rabat", pop: "38.2M", area: "446,550 KM²", gdp: "$140B (Nominal)", lang: "Arabic, Berber", cur: "MAD (Dirham)", fact: "Features the oldest continually operating university system in the world (Fez)." },
+      { name: "Mozambique", lat: -18.6657, lng: 35.5296, cap: "Maputo", pop: "34.8M", area: "801,590 KM²", gdp: "$22B (Nominal)", lang: "Portuguese", cur: "MZN (Metical)", fact: "Controls highly critical maritime transport infrastructure links on the Indian Ocean." },
+      { name: "Namibia", lat: -22.9576, lng: 18.4904, cap: "Windhoek", pop: "2.7M", area: "824,292 KM²", gdp: "$13B (Nominal)", lang: "English", cur: "NAD (Dollar)", fact: "Where the oldest desert on Earth directly intersects with high-velocity coastal cliffs." },
+      { name: "Niger", lat: 17.6078, lng: 8.0817, cap: "Niamey", pop: "27.0M", area: "1,267,000 KM²", gdp: "$17B (Nominal)", lang: "French", cur: "XOF (CFA Franc)", fact: "Major global contributor of high-grade commercial uranium mining assets." },
+      { name: "Nigeria", lat: 9.0820, lng: 8.6753, cap: "Abuja", pop: "229.2M", area: "923,768 KM²", gdp: "$390B (Nominal)", lang: "English", cur: "NGN (Naira)", fact: "The most populous African superpower; massive tech, media, and oil core." },
+      { name: "Rwanda", lat: -1.9403, lng: 29.8739, cap: "Kigali", pop: "14.4M", area: "26,338 KM²", gdp: "$13B (Nominal)", lang: "Kinyarwanda, French, English", cur: "RWF (Franc)", fact: "Global benchmark leader for absolute female parliamentary representation majorities." },
+      { name: "São Tomé and Príncipe", lat: 0.1864, lng: 6.6131, cap: "São Tomé", pop: "235K", area: "964 KM²", gdp: "$600M (Nominal)", lang: "Portuguese", cur: "STN (Dobra)", fact: "Volcanic island nation renowned for premium small-batch organic chocolate exports." },
+      { name: "Senegal", lat: 14.4974, lng: -14.4524, cap: "Dakar", pop: "18.3M", area: "196,722 KM²", gdp: "$31B (Nominal)", lang: "French", cur: "XOF (CFA Franc)", fact: "Dakar hosts the tallest absolute structural monument on the African continent." },
+      { name: "Seychelles", lat: -4.6796, lng: 55.4920, cap: "Victoria", pop: "103K", area: "452 KM²", gdp: "$2B (Nominal)", lang: "Creole, English, French", cur: "SCR (Rupee)", fact: "The smallest sovereign nation by population dynamic in the entire African system." },
+      { name: "Sierra Leone", lat: 8.4606, lng: -11.7799, cap: "Freetown", pop: "8.9M", area: "71,740 KM²", gdp: "$4B (Nominal)", lang: "English", cur: "SLE (Leone)", fact: "Natural harbor grids exceptionally rich in high-grade diamond mineral nodes." },
+      { name: "Somalia", lat: 5.1521, lng: 46.1996, cap: "Mogadishu", pop: "18.7M", area: "637,657 KM²", gdp: "$11B (Nominal)", lang: "Somali, Arabic", cur: "SOS (Shilling)", fact: "Maintains the absolute longest unbroken coastal vector line on mainland Africa." },
+      { name: "South Africa", lat: -30.5595, lng: 22.9375, cap: "Pretoria", pop: "61.0M", area: "1,221,037 KM²", gdp: "$380B (Nominal)", lang: "12 Official Languages", cur: "ZAR (Rand)", fact: "Industrial core matrix; uniquely executes operations across three distinct capital nodes." },
+      { name: "South Sudan", lat: 6.8770, lng: 31.3070, cap: "Juba", pop: "11.2M", area: "644,329 KM²", gdp: "$6B (Nominal)", lang: "English", cur: "SSP (Pound)", fact: "The absolute youngest internationally recognized nation-state globally." },
+      { name: "Sudan", lat: 12.8628, lng: 30.2176, cap: "Khartoum", pop: "49.0M", area: "1,861,484 KM²", gdp: "$26B (Nominal)", lang: "Arabic, English", cur: "SDG (Pound)", fact: "Geographically contains more standalone ancient pyramid ruins than Egypt." },
+      { name: "Tanzania", lat: -6.3690, lng: 34.8888, cap: "Dodoma", pop: "68.5M", area: "947,300 KM²", gdp: "$79B (Nominal)", lang: "Swahili, English", cur: "TZS (Shilling)", fact: "Anchored by Mount Kilimanjaro and the vast wildlife vectors of the Serengeti." },
+      { name: "Togo", lat: 8.6195, lng: 0.8248, cap: "Lomé", pop: "9.3M", area: "56,785 KM²", gdp: "$9B (Nominal)", lang: "French", cur: "XOF (CFA Franc)", fact: "Operates an important deep-water maritime commercial shipping port hub." },
+      { name: "Tunisia", lat: 33.8869, lng: 9.5375, cap: "Tunis", pop: "12.5M", area: "163,610 KM²", gdp: "$51B (Nominal)", lang: "Arabic", cur: "TND (Dinar)", fact: "The historical northern geographic cradle of the ancient Carthage civilization." },
+      { name: "Uganda", lat: 1.3733, lng: 32.2903, cap: "Kampala", pop: "49.6M", area: "241,038 KM²", gdp: "$49B (Nominal)", lang: "English, Swahili", cur: "UGX (Shilling)", fact: "Maintains high density biodiversity networks across the primary Nile source stream." },
+      { name: "Zambia", lat: -13.1339, lng: 27.8493, cap: "Lusaka", pop: "21.1M", area: "752,618 KM²", gdp: "$29B (Nominal)", lang: "English", cur: "ZMW (Kwacha)", fact: "Shares the spectacular structural boundary vector of Victoria Falls." },
+      { name: "Zimbabwe", lat: -19.0154, lng: 29.1549, cap: "Harare", pop: "17.0M", area: "390,757 KM²", gdp: "$27B (Nominal)", lang: "16 Official Languages", cur: "ZWG (ZiG)", fact: "Location of the massive stone architectural layouts of Great Zimbabwe." }
+    ];
+
+    // Local Web Audio Frequency Synthesizer Core
+    let audioCtx = null;
+    function playBeep(freq = 1000, duration = 0.05, vol = 0.05, type = 'sine') {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function playFlySound() {
+      playBeep(240, 0.4, 0.15, 'sawtooth');
+      setTimeout(() => playBeep(90, 0.3, 0.3, 'sine'), 150);
+    }
+
+    // Initialize Procedural Tactical Globe (No Web Textures Needed)
+    const container = document.getElementById('globe-container');
+    const world = Globe()(container)
+      .backgroundColor('#010308')
+      .globeColor('#071124')          // Solid high-tech vector dark blue baseline
+      .showAtmosphere(true)
+      .atmosphereColor('#00f0ff')
+      .atmosphereAltitude(0.16)
+      .showGraticules(true);          // Procedural longitude/latitude layout lines mapped directly
+
+    world.controls().autoRotate = true;
+    world.controls().autoRotateSpeed = 0.3;
+    world.controls().enableZoom = true;
+
+    // Inject Vector Pulse Array Points onto coordinates
+    world.ringsData(sectors)
+      .ringLat(d => d.lat)
+      .ringLng(d => d.lng)
+      .ringColor(() => '#00f0ff')
+      .ringMaxRadius(7)
+      .ringPropagationSpeed(1.5)
+      .ringRepeatPeriod(1200);
+
+    // Build Input Selection Interface Matrix
+    function renderMacroGrid(filter = "") {
+      const grid = document.getElementById('macro-grid');
+      grid.innerHTML = "";
+      
+      sectors.forEach(s => {
+        if (filter && !s.name.toLowerCase().includes(filter.toLowerCase())) return;
+
+        const key = document.createElement('div');
+        key.className = 'macro-key';
+        key.innerText = `[${s.name.toUpperCase()}]`;
+        key.setAttribute('data-sector', s.name);
+
+        key.onclick = () => {
+          document.querySelectorAll('.macro-key').forEach(k => k.classList.remove('active-lock'));
+          key.classList.add('active-lock');
+          executeTacticalDive(s);
+        };
+        grid.appendChild(key);
+      });
+    }
+
+    let printTimeouts = [];
+    function runTypewriterHUD(elementId, dataString) {
+      const el = document.getElementById(elementId);
+      el.textContent = "";
+      let idx = 0;
+      function write() {
+        if (idx < dataString.length) {
+          el.textContent += dataString.charAt(idx);
+          if (idx % 4 === 0) playBeep(2800 + Math.random() * 400, 0.008, 0.01);
+          idx++;
+          let t = setTimeout(write, 8);
+          printTimeouts.push(t);
+        }
+      }
+      write();
+    }
+
+    // Camera Flight Execution Logic
+    function executeTacticalDive(sector) {
+      // Initialize audio on first physical key trigger event
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      
+      playBeep(1200, 0.08, 0.1);
+      world.controls().autoRotate = false;
+
+      // Reset panels during transit phase
+      printTimeouts.forEach(clearTimeout);
+      printTimeouts = [];
+      
+      const panel = document.getElementById('intel-panel');
+      const statusIndicator = document.getElementById('scan-indicator');
+      panel.classList.add('active');
+      statusIndicator.innerText = "APPROACHING SECTOR...";
+      statusIndicator.style.background = "#ff0055";
+
+      // Clear layout fields to maintain security locks
+      ['m-name', 'm-capital', 'm-pop', 'm-area', 'm-gdp', 'm-lang', 'm-currency', 'm-brief'].forEach(id => {
+        document.getElementById(id).innerText = "--";
+      });
+
+      // Execute Smooth Dive to ultra-close boundary altitude
+      const FLIGHT_DURATION = 2400;
+      world.pointOfView({ lat: sector.lat, lng: sector.lng, altitude: 0.25 }, FLIGHT_DURATION);
+      playFlySound();
+
+      // Trigger metric printout strictly on arrival
+      setTimeout(() => {
+        playBeep(880, 0.2, 0.15);
+        statusIndicator.innerText = "BORDER LOCKED";
+        statusIndicator.style.background = "#00ff66";
+
+        runTypewriterHUD('m-name', sector.name.toUpperCase());
+        runTypewriterHUD('m-capital', sector.cap.toUpperCase());
+        runTypewriterHUD('m-pop', sector.pop);
+        runTypewriterHUD('m-area', sector.area);
+        runTypewriterHUD('m-gdp', sector.gdp);
+        runTypewriterHUD('m-lang', sector.lang.toUpperCase());
+        runTypewriterHUD('m-currency', sector.cur.toUpperCase());
+        
+        document.getElementById('m-brief').innerText = `> REPORT INTEL: ${sector.fact}`;
+      }, FLIGHT_DURATION);
+    }
+
+    // Structural Filter Input Tracking
+    document.getElementById('matrix-search').addEventListener('input', (e) => {
+      renderMacroGrid(e.target.value);
+    });
+
+    // Reset Velocity Controls
+    document.getElementById('system-reset').addEventListener('click', () => {
+      printTimeouts.forEach(clearTimeout);
+      printTimeouts = [];
+      document.querySelectorAll('.macro-key').forEach(k => k.classList.remove('active-lock'));
+      document.getElementById('intel-panel').classList.remove('active');
+      document.getElementById('matrix-search').value = "";
+      renderMacroGrid();
+      
+      world.controls().autoRotate = true;
+      world.pointOfView({ lat: 5.0, lng: 18.0, altitude: 2.3 }, 1200);
+      playBeep(450, 0.2, 0.05);
+    });
+
+    // Track Pointer Coordinates
+    window.addEventListener('mousemove', (e) => {
+      const lat = ((e.clientY / window.innerHeight) * -180 + 90).toFixed(4);
+      const lng = ((e.clientX / window.innerWidth) * 360 - 180).toFixed(4);
+      document.getElementById('hud-coordinates').innerText = `SYS.ORBITAL // LAT: ${lat}° | LNG: ${lng}°`;
+    });
+
+    // Initial Core Render Sequence
+    renderMacroGrid();
+    setTimeout(() => {
+      world.pointOfView({ lat: 4.0, lng: 20.0, altitude: 2.3 }, 1500);
+    }, 300);
+
+    window.addEventListener('resize', () => {
+      world.width(window.innerWidth); world.height(window.innerHeight);
+    });
+  </script>
+</body>
+</html>
