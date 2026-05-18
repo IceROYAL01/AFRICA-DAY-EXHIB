@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>AFRICA DAY // J.A.R.V.I.S. — Геопространственный Командный Центр</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+    :root {
+      --cyan: #00f0ff;
+      --gold: #ffd700;
+      --red: #ff3355;
+      --bg-dark: #010a14;
+      --panel-bg: rgba(1, 10, 20, 0.88);
+      --border-glow: rgba(0, 240, 255, 0.28);
+    }
+    body {
+      overflow: hidden;
+      background: radial-gradient(ellipse at 30% 40%, #001220 0%, #000000 100%);
+      font-family: 'Rajdhani', sans-serif;
+      color: #fff;
+    }
+    .scanlines {
+      position: fixed; inset: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+      pointer-events: none; z-index: 98;
+    }
+    .vignette {
+      position: fixed; inset: 0; background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.7) 100%);
+      pointer-events: none; z-index: 97;
+    }
+    #globe-container { position: fixed; inset: 0; z-index: 1; }
+    #particle-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+
+    /* Language switch */
+    .lang-switch {
+      position: fixed; top: 20px; right: 20px; z-index: 200;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(12px);
+      padding: 6px 12px; border-radius: 40px; border: 1px solid var(--cyan);
+      font-family: 'Orbitron', sans-serif; font-size: 0.8rem;
+      cursor: pointer; transition: 0.2s; color: var(--cyan);
+      letter-spacing: 1px; font-weight: bold;
+    }
+    .lang-switch:hover { background: var(--cyan); color: #000; box-shadow: 0 0 15px var(--cyan); }
+
+    /* Left tactical grid */
+    .command-grid-panel {
+      position: absolute; top: 18px; left: 18px; bottom: 18px;
+      width: 340px; background: var(--panel-bg); backdrop-filter: blur(16px);
+      border: 1px solid var(--border-glow); border-radius: 12px;
+      display: flex; flex-direction: column; z-index: 15;
+      box-shadow: 0 0 30px rgba(0,0,0,0.6);
+    }
+    .sidebar-header {
+      padding: 14px 18px; border-bottom: 1px solid rgba(0,240,255,0.2);
+      font-family: 'Orbitron', sans-serif; font-size: 0.9rem;
+      letter-spacing: 2px; color: var(--gold);
+    }
+    .filter-box { padding: 12px 15px; border-bottom: 1px solid rgba(0,240,255,0.1); }
+    .filter-box input {
+      width: 100%; background: rgba(0,240,255,0.05); border: 1px solid var(--border-glow);
+      padding: 8px 12px; color: #fff; font-family: 'Share Tech Mono', monospace;
+      border-radius: 30px; outline: none;
+    }
+    .filter-box input:focus { border-color: var(--cyan); background: rgba(0,240,255,0.1); }
+    .grid-container {
+      flex: 1; overflow-y: auto; padding: 15px;
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+    }
+    .grid-container::-webkit-scrollbar { width: 3px; }
+    .grid-container::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 10px; }
+    .sector-btn {
+      background: rgba(0,240,255,0.04); border: 1px solid rgba(0,240,255,0.2);
+      color: #ccf5ff; font-family: 'Share Tech Mono', monospace;
+      font-size: 0.7rem; padding: 7px 2px; text-align: center; border-radius: 6px;
+      cursor: pointer; transition: 0.12s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sector-btn:hover { background: rgba(0,240,255,0.2); border-color: var(--cyan); color: var(--cyan); }
+    .sector-btn.active-btn { background: var(--cyan); color: #000; font-weight: bold; border-color: white; }
+    .reset-btn {
+      background: none; border: 1px solid rgba(255,0,85,0.4); color: #ff6680;
+      width: calc(100% - 20px); margin: 10px; padding: 8px; border-radius: 40px;
+      font-family: 'Orbitron', sans-serif; font-size: 0.7rem;
+      cursor: pointer; transition: 0.2s;
+    }
+    .reset-btn:hover { background: rgba(255,0,85,0.2); border-color: var(--red); color: var(--red); }
+
+    /* Right JARVIS panel */
+    #jarvis-panel {
+      position: fixed; top: 80px; right: 18px; width: 400px; max-width: calc(100% - 380px);
+      z-index: 12; opacity: 0; transform: translateX(40px);
+      transition: all 0.4s cubic-bezier(0.2,0.9,0.4,1.1); pointer-events: none;
+      max-height: calc(100vh - 110px); overflow-y: auto;
+    }
+    #jarvis-panel.active { opacity: 1; transform: translateX(0); pointer-events: auto; }
+    .p-card {
+      background: rgba(1,12,24,0.92); backdrop-filter: blur(20px);
+      border: 1px solid var(--border-glow); border-radius: 16px;
+      padding: 18px; margin-bottom: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+    }
+    .p-section-head { display: flex; gap: 8px; font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; color: var(--cyan); margin-bottom: 15px; letter-spacing: 2px; }
+    .j-dot { width: 8px; height: 8px; background: var(--cyan); border-radius: 50%; box-shadow: 0 0 8px var(--cyan); }
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .s-card { background: rgba(0,240,255,0.04); padding: 8px 10px; border-radius: 10px; border-left: 2px solid var(--cyan); }
+    .s-lbl { font-size: 0.65rem; color: #8dd0ff; letter-spacing: 1px; }
+    .s-val { font-size: 1rem; font-weight: 600; color: white; }
+    .flag-box { width: 70px; height: 48px; border-radius: 6px; overflow: hidden; background: #000; border: 1px solid var(--cyan); display: flex; align-items: center; justify-content: center; }
+    .flag-box img { width: 100%; height: 100%; object-fit: cover; }
+    .cname { font-family: 'Orbitron', sans-serif; font-size: 1.1rem; text-transform: uppercase; }
+    .cregion { font-size: 0.7rem; background: rgba(0,240,255,0.15); padding: 2px 8px; border-radius: 20px; display: inline-block; margin-top: 4px; }
+    .fact-box { background: rgba(255,215,0,0.05); border-left: 3px solid var(--gold); padding: 12px; border-radius: 8px; margin-top: 8px; }
+    #fact-text { font-style: italic; color: #ffefb0; line-height: 1.4; font-size: 0.9rem; min-height: 70px; }
+
+    /* Bottom search & coords */
+    #coords-display {
+      position: fixed; bottom: 20px; right: 25px; z-index: 15;
+      font-family: 'Share Tech Mono', monospace; background: rgba(0,0,0,0.55);
+      padding: 4px 10px; border-radius: 20px; font-size: 0.7rem;
+      backdrop-filter: blur(4px); color: var(--cyan);
+    }
+    #search-wrap {
+      position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+      z-index: 15; width: 460px; max-width: 90vw;
+    }
+    .search-bar { display: flex; gap: 8px; background: rgba(0,0,0,0.6); backdrop-filter: blur(12px); padding: 5px; border-radius: 60px; border: 1px solid var(--border-glow); }
+    #country-input { flex: 1; background: transparent; border: none; padding: 12px 18px; color: white; font-family: 'Rajdhani', sans-serif; outline: none; font-size: 0.9rem; }
+    #search-btn { background: rgba(0,240,255,0.1); border: 1px solid var(--cyan); border-radius: 40px; padding: 0 20px; color: var(--cyan); font-family: 'Orbitron', sans-serif; cursor: pointer; transition: 0.2s; }
+    #search-btn:hover { background: var(--cyan); color: black; box-shadow: 0 0 12px var(--cyan); }
+    .hints { display: flex; gap: 16px; justify-content: center; margin-top: 8px; font-size: 0.6rem; color: #aaa; font-family: monospace; }
+    .scan-txt { font-family: 'Share Tech Mono', monospace; color: var(--cyan); animation: blink 0.6s steps(1) infinite; }
+    .scan-bar { width: 100%; height: 3px; background: rgba(0,240,255,0.15); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+    .scan-fill { height: 100%; background: var(--cyan); width: 0%; transition: width 0.65s ease; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    @media (max-width: 800px) {
+      .command-grid-panel { width: 280px; }
+      #jarvis-panel { width: 320px; right: 10px; }
+    }
+    @media (max-width: 720px) { .command-grid-panel { display: none; } #jarvis-panel { max-width: 95%; right: 10px; left: auto; } }
+  </style>
+</head>
+<body>
+<div class="scanlines"></div>
+<div class="vignette"></div>
+<canvas id="particle-canvas"></canvas>
+<div id="globe-container"></div>
+<div class="lang-switch" id="langToggle">🇬🇧 EN / 🇷🇺 RU</div>
+
+<div class="command-grid-panel">
+  <div class="sidebar-header">🌍 ТАКТИЧЕСКАЯ СЕТКА / AFRICA</div>
+  <div class="filter-box"><input type="text" id="grid-search" placeholder="🔍 Фильтр / Filter..."></div>
+  <div class="grid-container" id="macro-grid"></div>
+  <button class="reset-btn" id="global-reset-btn">⟳ RESET ORBIT / СБРОС ВРАЩЕНИЯ</button>
+</div>
+
+<div id="jarvis-panel">
+  <div class="p-card" id="scanCard">
+    <div class="p-section-head"><div class="j-dot"></div><span id="scanLabel">SCANNING TARGET</span></div>
+    <div id="scan-state">
+      <div class="scan-txt" id="scanText">[ INITIALIZING ]</div>
+      <div class="scan-bar"><div class="scan-fill" id="scanFill"></div></div>
+    </div>
+    <div id="info-state" style="display:none">
+      <div style="display:flex; gap:12px; align-items:center;">
+        <div class="flag-box"><img id="flag-img" src="" style="display:none"><span id="flag-emoji" style="font-size:2rem;"></span></div>
+        <div><div class="cname" id="cname"></div><span class="cregion" id="cregion"></span></div>
+      </div>
+    </div>
+  </div>
+  <div class="p-card" id="stats-card" style="display:none"><div class="p-section-head"><div class="j-dot"></div><span id="statLabel">VITAL STATISTICS</span></div><div class="stats-grid" id="statsGrid"></div></div>
+  <div class="p-card" id="intel-card" style="display:none"><div class="p-section-head"><div class="j-dot"></div><span id="intelLabel">INTELLIGENCE BRIEF</span></div><div id="intelContent"></div></div>
+  <div class="p-card" id="fact-card" style="display:none"><div class="fact-box"><span id="factLabel">🔍 FIELD INTEL</span><div id="fact-text"></div></div></div>
+</div>
+
+<div id="search-wrap">
+  <div class="search-bar">
+    <input type="text" id="country-input" placeholder="Поиск страны / Search country..." autocomplete="off">
+    <button id="search-btn">🔍 LOCATE</button>
+  </div>
+  <div class="hints"><span>⏎ ENTER</span><span>↑↓</span><span>⎵ SPACE reset</span><span>ESC</span></div>
+</div>
+<div id="coords-display">LAT: --° | LNG: --°</div>
+
+<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+<script src="https://unpkg.com/globe.gl@2.32.0/dist/globe.gl.min.js"></script>
+<script>
+(async function(){
+  // ----------------------------------------------- ПОЛНАЯ БАЗА ДАННЫХ 54 СТРАН (EN / RU) -----------------------------------------------
+  const fullDataset = [
+    {en:{name:"Algeria",capital:"Algiers",pop:"45.6M",area:"2,381,741 km²",gdp:"$191.9B",gdppc:"$4,207",langs:["Arabic","Tamazight"],currency:"Algerian Dinar",indep:"July 5, 1962",code:"+213",region:"North Africa",fact:"Largest country in Africa by area — 90% Sahara. UNESCO sites."},ru:{name:"Алжир",capital:"Алжир",pop:"45.6 млн",area:"2 381 741 км²",gdp:"$191.9 млрд",gdppc:"$4 207",langs:["Арабский","Тамазигхт"],currency:"Алжирский динар",indep:"5 июля 1962",code:"+213",region:"Северная Африка",fact:"Крупнейшая страна Африки, 90% Сахара. Объекты ЮНЕСКО."},flag:"dz",emoji:"🇩🇿"},
+    {en:{name:"Nigeria",capital:"Abuja",pop:"218.5M",area:"923,768 km²",gdp:"$477.4B",gdppc:"$2,184",langs:["English","Hausa","Yoruba"],currency:"Nigerian Naira",indep:"Oct 1, 1960",code:"+234",region:"West Africa",fact:"Most populous African nation, Nollywood second largest film industry."},ru:{name:"Нигерия",capital:"Абуджа",pop:"218.5 млн",area:"923 768 км²",gdp:"$477.4 млрд",gdppc:"$2 184",langs:["Английский","Хауса","Йоруба"],currency:"Найра",indep:"1 октября 1960",code:"+234",region:"Западная Африка",fact:"Самая населённая страна Африки, Нолливуд №2."},flag:"ng",emoji:"🇳🇬"},
+    {en:{name:"Egypt",capital:"Cairo",pop:"109M",area:"1,001,450 km²",gdp:"$476.7B",gdppc:"$4,376",langs:["Arabic"],currency:"Egyptian Pound",indep:"Feb 28, 1922",code:"+20",region:"North Africa",fact:"Home to Great Pyramids and Suez Canal — ancient wonders."},ru:{name:"Египет",capital:"Каир",pop:"109 млн",area:"1 001 450 км²",gdp:"$476.7 млрд",gdppc:"$4 376",langs:["Арабский"],currency:"Египетский фунт",indep:"28 фев 1922",code:"+20",region:"Северная Африка",fact:"Великие пирамиды, Суэцкий канал."},flag:"eg",emoji:"🇪🇬"},
+    {en:{name:"South Africa",capital:"Pretoria/Cape Town",pop:"60.6M",area:"1,219,090 km²",gdp:"$405.9B",gdppc:"$6,701",langs:["Zulu","Xhosa","Afrikaans"],currency:"South African Rand",indep:"May 31, 1910",code:"+27",region:"Southern Africa",fact:"11 official languages, Cradle of Humankind."},ru:{name:"ЮАР",capital:"Претория/Кейптаун",pop:"60.6 млн",area:"1 219 090 км²",gdp:"$405.9 млрд",gdppc:"$6 701",langs:["Зулу","Коса","Африкаанс"],currency:"Южноафриканский рэнд",indep:"31 мая 1910",code:"+27",region:"Южная Африка",fact:"11 гос. языков, колыбель человечества."},flag:"za",emoji:"🇿🇦"},
+    {en:{name:"Kenya",capital:"Nairobi",pop:"56M",area:"580,367 km²",gdp:"$110.9B",gdppc:"$1,980",langs:["Swahili","English"],currency:"Kenyan Shilling",indep:"Dec 12, 1963",code:"+254",region:"East Africa",fact:"Great Rift Valley, safari capital, running dominance."},ru:{name:"Кения",capital:"Найроби",pop:"56 млн",area:"580 367 км²",gdp:"$110.9 млрд",gdppc:"$1 980",langs:["Суахили","Английский"],currency:"Кенийский шиллинг",indep:"12 дек 1963",code:"+254",region:"Восточная Африка",fact:"Великая рифтовая долина, беговые рекорды."},flag:"ke",emoji:"🇰🇪"},
+    {en:{name:"Ethiopia",capital:"Addis Ababa",pop:"126M",area:"1,104,300 km²",gdp:"$126.8B",gdppc:"$1,007",langs:["Amharic","Oromo"],currency:"Ethiopian Birr",indep:"Never colonized",code:"+251",region:"East Africa",fact:"Birthplace of coffee, never colonized, African Union HQ."},ru:{name:"Эфиопия",capital:"Аддис-Абеба",pop:"126 млн",area:"1 104 300 км²",gdp:"$126.8 млрд",gdppc:"$1 007",langs:["Амхарский","Оромо"],currency:"Эфиопский бырр",indep:"Никогда не колонизирована",code:"+251",region:"Восточная Африка",fact:"Родина кофе, штаб-квартира Африканского союза."},flag:"et",emoji:"🇪🇹"},
+    {en:{name:"Morocco",capital:"Rabat",pop:"37.8M",area:"710,850 km²",gdp:"$142.9B",gdppc:"$3,779",langs:["Arabic","Berber"],currency:"Moroccan Dirham",indep:"Mar 2, 1956",code:"+212",region:"North Africa",fact:"Oldest university (Fez, 859 AD) and rich medinas."},ru:{name:"Марокко",capital:"Рабат",pop:"37.8 млн",area:"710 850 км²",gdp:"$142.9 млрд",gdppc:"$3 779",langs:["Арабский","Берберский"],currency:"Марокканский дирхам",indep:"2 марта 1956",code:"+212",region:"Северная Африка",fact:"Древнейший университет (Фес, 859 г.)."},flag:"ma",emoji:"🇲🇦"}
+  ];
+  // добавим остальные 47 стран (упрощённо, но все 54 будут доступны)
+  const moreNames = ["Angola","Benin","Botswana","Burkina Faso","Burundi","Cabo Verde","Cameroon","Central African Republic","Chad","Comoros","DR Congo","Republic of Congo","Djibouti","Equatorial Guinea","Eritrea","Eswatini","Gabon","Gambia","Ghana","Guinea","Guinea-Bissau","Ivory Coast","Lesotho","Liberia","Libya","Madagascar","Malawi","Mali","Mauritania","Mauritius","Mozambique","Namibia","Niger","Rwanda","São Tomé & Príncipe","Senegal","Seychelles","Sierra Leone","Somalia","South Sudan","Sudan","Tanzania","Togo","Tunisia","Uganda","Zambia","Zimbabwe"];
+  for(let nm of moreNames){
+    if(!fullDataset.some(c=>c.en.name===nm)){
+      fullDataset.push({en:{name:nm,capital:"—",pop:"—",area:"—",gdp:"—",gdppc:"—",langs:["—"],currency:"—",indep:"—",code:"—",region:"Africa",fact:"Discover the heritage of Africa."},ru:{name:nm,capital:"—",pop:"—",area:"—",gdp:"—",gdppc:"—",langs:["—"],currency:"—",indep:"—",code:"—",region:"Африка",fact:"Изучите богатство Африки."},flag:"un",emoji:"🌍"});
+    }
+  }
+  const DB = fullDataset;
+  
+  // GLOBALS
+  let currentLang = 'en';
+  let currentCountry = null;
+  let geoJsonFeatures = [];
+  let world, selectedFeature = null;
+  let audioCtx = null;
+  let typeTimeouts = [];
+  
+  // Audio helpers (full from africa-day-ultra)
+  function initAudio(){ if(!audioCtx){ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume(); } }
+  function playBeep(f=1200, d=0.06, v=0.08){ initAudio(); const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type='sine'; o.frequency.value=f; g.gain.value=v; g.gain.exponentialRampToValueAtTime(0.001, d); o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+d); }
+  function playScan(){ initAudio(); const n=audioCtx.currentTime; const o=audioCtx.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(450,n); o.frequency.exponentialRampToValueAtTime(1400,n+0.35); const g=audioCtx.createGain(); g.gain.setValueAtTime(0.18,n); g.gain.exponentialRampToValueAtTime(0.001,n+0.65); o.connect(g); g.connect(audioCtx.destination); o.start(n); o.stop(n+0.65); }
+  function playWhoosh(){ initAudio(); const n=audioCtx.currentTime; const osc=audioCtx.createOscillator(); osc.type='sawtooth'; osc.frequency.setValueAtTime(800,n); osc.frequency.exponentialRampToValueAtTime(200,n+0.3); const gain=audioCtx.createGain(); gain.gain.setValueAtTime(0.1,n); gain.gain.exponentialRampToValueAtTime(0.001,n+0.35); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(n); osc.stop(n+0.35); }
+  function playBoom(){ initAudio(); const n=audioCtx.currentTime; const o1=audioCtx.createOscillator(); o1.type='sine'; o1.frequency.setValueAtTime(100,n); o1.frequency.exponentialRampToValueAtTime(30,n+0.55); const g=audioCtx.createGain(); g.gain.setValueAtTime(1.2,n); g.gain.exponentialRampToValueAtTime(0.001,n+0.55); o1.connect(g); g.connect(audioCtx.destination); o1.start(n); o1.stop(n+0.55); }
+  
+  // Typewriter effect
+  function typeText(element, text, speed=20){
+    element.textContent = '';
+    let i=0;
+    function type(){
+      if(i<text.length){ element.textContent += text.charAt(i); i++; setTimeout(type, speed); }
+    }
+    type();
+  }
+  
+  // Locate function - identical to Africa Day Ultra's powerful locate()
+  async function locate(countryName){
+    const entry = DB.find(c=>c.en.name.toLowerCase() === countryName.toLowerCase());
+    if(!entry) { console.warn("Not found"); return; }
+    currentCountry = entry;
+    // stop auto-rotate
+    world.controls().autoRotate = false;
+    // Scan animation & sound
+    const scanDiv = document.getElementById('scan-state');
+    const infoDiv = document.getElementById('info-state');
+    scanDiv.style.display = 'flex';
+    infoDiv.style.display = 'none';
+    document.getElementById('stats-card').style.display = 'none';
+    document.getElementById('intel-card').style.display = 'none';
+    document.getElementById('fact-card').style.display = 'none';
+    document.getElementById('jarvis-panel').classList.add('active');
+    const fillBar = document.getElementById('scanFill');
+    fillBar.style.width = '0%';
+    fillBar.style.transition = 'none';
+    fillBar.offsetHeight;
+    fillBar.style.transition = 'width 0.65s ease';
+    fillBar.style.width = '100%';
+    playScan();
+    // find polygon centroid
+    const feat = geoJsonFeatures.find(f=>f.properties.name.toLowerCase() === countryName.toLowerCase());
+    if(feat){
+      if(selectedFeature) world.polygonCapColor(()=>'rgba(0,130,200,0.07)');
+      selectedFeature = feat;
+      world.polygonCapColor(f=> f===feat ? 'rgba(0,240,255,0.65)' : 'rgba(0,130,200,0.07)');
+      const centroid = calcCentroid(feat);
+      world.pointOfView({ lat: centroid[1], lng: centroid[0], altitude: 0.85 }, 1300);
+    }
+    setTimeout(playWhoosh, 80);
+    setTimeout(playBoom, 500);
+    await new Promise(r=>setTimeout(r, 720));
+    // swap to data panel
+    scanDiv.style.display = 'none';
+    infoDiv.style.display = 'flex';
+    document.getElementById('stats-card').style.display = 'block';
+    document.getElementById('intel-card').style.display = 'block';
+    document.getElementById('fact-card').style.display = 'block';
+    const data = entry[currentLang];
+    const enData = entry.en;
+    document.getElementById('cname').innerHTML = data.name.toUpperCase();
+    document.getElementById('cregion').innerHTML = data.region;
+    const flagImg = document.getElementById('flag-img');
+    flagImg.src = `https://flagcdn.com/w80/${entry.flag||'un'}.png`;
+    flagImg.style.display = 'block';
+    document.getElementById('flag-emoji').style.display = 'none';
+    flagImg.onerror = ()=>{ flagImg.style.display='none'; document.getElementById('flag-emoji').innerText=entry.emoji||'🌍'; document.getElementById('flag-emoji').style.display='block'; };
+    // stats grid
+    document.getElementById('statsGrid').innerHTML = `
+      <div class="s-card"><span class="s-lbl">${currentLang==='en'?'CAPITAL':'СТОЛИЦА'}</span><span class="s-val">${data.capital}</span></div>
+      <div class="s-card"><span class="s-lbl">${currentLang==='en'?'POPULATION':'НАСЕЛЕНИЕ'}</span><span class="s-val">${data.pop}</span></div>
+      <div class="s-card"><span class="s-lbl">${currentLang==='en'?'AREA':'ПЛОЩАДЬ'}</span><span class="s-val">${data.area}</span></div>
+      <div class="s-card"><span class="s-lbl">GDP</span><span class="s-val">${data.gdp}</span></div>
+    `;
+    document.getElementById('intelContent').innerHTML = `
+      <div class="d-row" style="margin-bottom:8px;"><span class="d-lbl">${currentLang==='en'?'LANGUAGES':'ЯЗЫКИ'}</span><div>${data.langs.map(l=>`<span style="background:#00f0ff10; padding:2px 8px; border-radius:20px; margin:2px;">${l}</span>`).join(' ')}</div></div>
+      <div class="d-row" style="margin-bottom:8px;"><span class="d-lbl">${currentLang==='en'?'CURRENCY':'ВАЛЮТА'}</span><span>${data.currency}</span></div>
+      <div class="d-row" style="margin-bottom:8px;"><span class="d-lbl">${currentLang==='en'?'INDEPENDENCE':'НЕЗАВИСИМОСТЬ'}</span><span>${data.indep}</span></div>
+      <div class="d-row"><span class="d-lbl">CALLING CODE</span><span>${data.code}</span></div>
+    `;
+    typeText(document.getElementById('fact-text'), data.fact, 18);
+    // highlight sidebar button
+    document.querySelectorAll('.sector-btn').forEach(btn=>{
+      if(btn.getAttribute('data-key') === entry.en.name) btn.classList.add('active-btn');
+      else btn.classList.remove('active-btn');
+    });
+  }
+  
+  function calcCentroid(feature){
+    let coords=[];
+    const collect = (geom)=>{
+      if(geom.type==='Polygon') geom.coordinates[0].forEach(c=>coords.push(c));
+      else if(geom.type==='MultiPolygon') geom.coordinates.forEach(p=>p[0].forEach(c=>coords.push(c)));
+    };
+    collect(feature.geometry);
+    if(coords.length===0) return [20,5];
+    const sum = coords.reduce((a,b)=>[a[0]+b[0], a[1]+b[1]],[0,0]);
+    return [sum[0]/coords.length, sum[1]/coords.length];
+  }
+  
+  // Build left grid
+  function buildGrid(filter=''){
+    const container = document.getElementById('macro-grid');
+    container.innerHTML = '';
+    const filtered = DB.filter(c=> (currentLang==='en'?c.en.name:c.ru.name).toLowerCase().includes(filter.toLowerCase()));
+    filtered.forEach(c=>{
+      const btn = document.createElement('div');
+      btn.className = 'sector-btn';
+      btn.innerText = (currentLang==='en'?c.en.name:c.ru.name).toUpperCase();
+      btn.setAttribute('data-key', c.en.name);
+      btn.addEventListener('click',()=>{ playBeep(1400,0.08,0.1); locate(c.en.name); });
+      container.appendChild(btn);
+    });
+  }
+  
+  function resetOrbit(){
+    if(selectedFeature) world.polygonCapColor(()=>'rgba(0,130,200,0.07)');
+    selectedFeature = null;
+    world.controls().autoRotate = true;
+    world.controls().autoRotateSpeed = 0.45;
+    world.pointOfView({ lat: 8, lng: 20, altitude: 1.9 }, 1200);
+    document.getElementById('jarvis-panel').classList.remove('active');
+    document.getElementById('scan-state').style.display = 'flex';
+    document.getElementById('info-state').style.display = 'none';
+    document.getElementById('stats-card').style.display = 'none';
+    document.getElementById('intel-card').style.display = 'none';
+    document.getElementById('fact-card').style.display = 'none';
+    document.querySelectorAll('.sector-btn').forEach(b=>b.classList.remove('active-btn'));
+    playBeep(600,0.12,0.05);
+  }
+  
+  // Init globe & GeoJSON
+  const container = document.getElementById('globe-container');
+  world = Globe()(container)
+    .globeImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg')
+    .bumpImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png')
+    .backgroundColor('rgba(0,0,0,0)')
+    .atmosphereColor('#00aaff')
+    .atmosphereAltitude(0.25)
+    .polygonStrokeColor(()=>'rgba(0,240,255,0.3)')
+    .polygonCapColor(()=>'rgba(0,130,200,0.07)')
+    .polygonsTransitionDuration(400);
+  world.controls().autoRotate = true;
+  world.controls().autoRotateSpeed = 0.45;
+  world.controls().enableZoom = true;
+  world.controls().enableDamping = true;
+  
+  const geoResp = await fetch('https://raw.githubusercontent.com/vasturiano/globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson');
+  const geoData = await geoResp.json();
+  geoJsonFeatures = geoData.features;
+  world.polygonsData(geoJsonFeatures);
+  world.onPolygonClick(poly=>{
+    if(poly && poly.properties){
+      const name = poly.properties.name;
+      let match = DB.find(c=>c.en.name.toLowerCase()===name.toLowerCase());
+      if(!match) match = DB.find(c=>name.toLowerCase().includes(c.en.name.toLowerCase()));
+      if(match) locate(match.en.name);
+    }
+  });
+  buildGrid();
+  
+  // UI events
+  document.getElementById('search-btn').addEventListener('click',()=>{
+    const val = document.getElementById('country-input').value.trim();
+    if(!val) return;
+    let found = DB.find(c=> (currentLang==='en'?c.en.name:c.ru.name).toLowerCase() === val.toLowerCase());
+    if(!found) found = DB.find(c=>c.en.name.toLowerCase().includes(val.toLowerCase()));
+    if(found) locate(found.en.name);
+    else document.getElementById('country-input').classList.add('err') || setTimeout(()=>document.getElementById('country-input').classList.remove('err'),500);
+  });
+  document.getElementById('country-input').addEventListener('keypress',e=>{if(e.key==='Enter') document.getElementById('search-btn').click();});
+  document.getElementById('global-reset-btn').addEventListener('click',resetOrbit);
+  document.getElementById('grid-search').addEventListener('input',e=>buildGrid(e.target.value));
+  window.addEventListener('keydown',e=>{ if(e.code==='Space' && document.activeElement !== document.getElementById('country-input')){ e.preventDefault(); resetOrbit(); } if(e.code==='Escape') document.getElementById('country-input').value=''; });
+  window.addEventListener('mousemove',(e)=>{
+    const lat = ((e.clientY / window.innerHeight) * -180 + 90).toFixed(1);
+    const lng = ((e.clientX / window.innerWidth) * 360 - 180).toFixed(1);
+    document.getElementById('coords-display').innerHTML = `LAT: ${lat}° | LNG: ${lng}°`;
+  });
+  
+  // Language switcher (full UI refresh)
+  function applyLang(){
+    buildGrid(document.getElementById('grid-search').value);
+    document.querySelectorAll('.sidebar-header')[0].innerHTML = currentLang==='en'?'TACTICAL GRID // AFRICA':'ТАКТИЧЕСКАЯ СЕТКА // АФРИКА';
+    document.getElementById('global-reset-btn').innerHTML = currentLang==='en'?'⟳ RESET ORBIT MECHANICS':'⟳ СБРОС ВРАЩЕНИЯ';
+    document.getElementById('scanLabel').innerHTML = currentLang==='en'?'SCANNING TARGET':'СКАНИРОВАНИЕ ЦЕЛИ';
+    document.getElementById('statLabel').innerHTML = currentLang==='en'?'VITAL STATISTICS':'ВИТАЛЬНЫЕ ДАННЫЕ';
+    document.getElementById('intelLabel').innerHTML = currentLang==='en'?'INTELLIGENCE BRIEF':'РАЗВЕДДАННЫЕ';
+    document.getElementById('factLabel').innerHTML = currentLang==='en'?'🔍 FIELD INTEL':'🔍 ПОЛЕВОЙ ОТЧЁТ';
+    document.getElementById('search-btn').innerHTML = currentLang==='en'?'LOCATE':'НАЙТИ';
+    document.getElementById('country-input').placeholder = currentLang==='en'?'Search African country...':'Поиск страны Африки...';
+    if(currentCountry) locate(currentCountry.en.name);
+    else resetOrbit();
+  }
+  document.getElementById('langToggle').addEventListener('click',()=>{ currentLang = currentLang==='en'?'ru':'en'; applyLang(); });
+  setTimeout(()=>{ world.pointOfView({ lat: 5, lng: 20, altitude: 1.9 }, 1000); applyLang(); }, 400);
+  window.addEventListener('resize',()=>{ world.width(window.innerWidth); world.height(window.innerHeight); });
+  document.body.addEventListener('click',()=>initAudio(), {once:true});
+})();
+</script>
+</body>
+</html>
